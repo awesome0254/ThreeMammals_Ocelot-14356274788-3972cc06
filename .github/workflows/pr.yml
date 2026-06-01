@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       # https://github.com/actions/setup-dotnet/blob/main/README.md#environment-variables
-      DOTNET_INSTALL_DIR: "/usr/lib/dotnet" # override /usr/share/dotnet
+      DOTNET_INSTALL_DIR: ${{ runner.temp }}/dotnet
     steps:
     - name: .NET Version 
       run: dotnet --version
@@ -46,6 +46,8 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     environment: build.cake
+    env:
+      DOTNET_INSTALL_DIR: ${{ runner.temp }}/dotnet
     steps:
     - name: .NET Version 
       run: dotnet --version
