@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       # https://github.com/actions/setup-dotnet/blob/main/README.md#environment-variables
-      DOTNET_INSTALL_DIR: "${{ runner.temp }}/dotnet"
+      DOTNET_INSTALL_DIR: "${{ github.workspace }}/.dotnet"
     steps:
     - name: .NET Version 
       run: dotnet --version
@@ -48,7 +48,7 @@ jobs:
     environment: build.cake
     env:
       # https://github.com/actions/setup-dotnet/blob/main/README.md#environment-variables
-      DOTNET_INSTALL_DIR: "${{ runner.temp }}/dotnet"
+      DOTNET_INSTALL_DIR: "${{ github.workspace }}/.dotnet"
     steps:
     - name: .NET Version 
       run: dotnet --version
