@@ -1,0 +1,138 @@
+# This workflow will build a .NET project
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-net
+name: PR
+on: pull_request
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      # https://github.com/actions/setup-dotnet/blob/main/README.md#environment-variables
+      DOTNET_INSTALL_DIR: "${{ github.workspace }}/.dotnet"
+    steps:
+    - name: .NET Version 
+      run: dotnet --version
+    - name: .NET Info
+      run: dotnet --info
+    - name: Check .NET 8
+      id: check-dotnet8
+      run: |
+        DOTNET8_VERSION=$(dotnet --version)
+        if [[ "$DOTNET8_VERSION" =~ ^8\.0\.[0-9]+$ ]]; then
+          echo "dotnet8_installed=true" >> $GITHUB_ENV
+        else
+          echo "dotnet8_installed=false" >> $GITHUB_ENV
+        fi
+    - name: Setup .NET 8
+      if: env.dotnet8_installed == 'false'
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: 8.0.114
+    - name: .NET Info
+      run: dotnet --info
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Restore
+      run: dotnet restore ./Ocelot.sln -p:TargetFramework=net8.0
+    - name: Build
+      run: dotnet build --no-restore ./Ocelot.sln --framework net8.0
+    - name: Stabilize timeout test host
+      run: |
+        echo "127.0.0.1 test.com" | sudo tee -a /etc/hosts
+        cat > /tmp/test_com_sink.py <<'PY'
+        import socket
+        import threading
+        import time
+
+        def hold(conn):
+            try:
+                time.sleep(3600)
+            finally:
+                try:
+                    conn.close()
+                except OSError:
+                    pass
+
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.bind(("0.0.0.0", 80))
+        sock.listen(128)
+        while True:
+            conn, _ = sock.accept()
+            threading.Thread(target=hold, args=(conn,), daemon=True).start()
+        PY
+        sudo nohup python3 /tmp/test_com_sink.py >/tmp/test-com-sink.log 2>&1 &
+        sleep 1
+    - name: Unit Tests
+      run: dotnet test --no-restore --no-build --verbosity normal --framework net8.0 ./test/Ocelot.UnitTests/Ocelot.UnitTests.csproj
+    - name: Integration Tests
+      run: dotnet test --no-restore --no-build --verbosity normal --framework net8.0 ./test/Ocelot.IntegrationTests/Ocelot.IntegrationTests.csproj
+    - name: Acceptance Tests
+      run: dotnet test --no-restore --no-build --verbosity normal --framework net8.0 ./test/Ocelot.AcceptanceTests/Ocelot.AcceptanceTests.csproj
+  build-cake:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: build.cake
+    env:
+      # https://github.com/actions/setup-dotnet/blob/main/README.md#environment-variables
+      DOTNET_INSTALL_DIR: "${{ github.workspace }}/.dotnet"
+    steps:
+    - name: .NET Version 
+      run: dotnet --version
+    - name: .NET Info
+      run: dotnet --info
+    - name: Check .NET 9
+      id: check-dotnet9
+      run: |
+        DOTNET9_VERSION=$(dotnet --version)
+        if [[ "$DOTNET9_VERSION" =~ ^9\.0\.[0-9]+$ ]]; then
+          echo "dotnet9_installed=true" >> $GITHUB_ENV
+        else
+          echo "dotnet9_installed=false" >> $GITHUB_ENV
+        fi
+    - name: Setup .NET 9
+      if: env.dotnet9_installed == 'false'
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: 9.0.203
+    - name: .NET Info
+      run: dotnet --info
+    - name: Branch Name
+      run: echo "Branch name is ${{ github.ref_name }}"
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Stabilize timeout test host
+      run: |
+        echo "127.0.0.1 test.com" | sudo tee -a /etc/hosts
+        cat > /tmp/test_com_sink.py <<'PY'
+        import socket
+        import threading
+        import time
+
+        def hold(conn):
+            try:
+                time.sleep(3600)
+            finally:
+                try:
+                    conn.close()
+                except OSError:
+                    pass
+
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.bind(("0.0.0.0", 80))
+        sock.listen(128)
+        while True:
+            conn, _ = sock.accept()
+            threading.Thread(target=hold, args=(conn,), daemon=True).start()
+        PY
+        sudo nohup python3 /tmp/test_com_sink.py >/tmp/test-com-sink.log 2>&1 &
+        sleep 1
+    - name: Cake Build
+      uses: cake-build/cake-action@v3
+      with:
+        target: PullRequest
+      env:
+        OCELOT_COVERALLS_TOKEN: ${{ secrets.OCELOT_COVERALLS_TOKEN }}
