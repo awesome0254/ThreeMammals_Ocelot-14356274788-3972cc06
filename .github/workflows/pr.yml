@@ -36,6 +36,8 @@ jobs:
       run: dotnet restore ./Ocelot.sln -p:TargetFramework=net8.0
     - name: Build
       run: dotnet build --no-restore ./Ocelot.sln --framework net8.0
+    - name: Force test.com to time out
+      run: echo "10.255.255.1 test.com" | sudo tee -a /etc/hosts
     - name: Unit Tests
       run: dotnet test --no-restore --no-build --verbosity normal --framework net8.0 ./test/Ocelot.UnitTests/Ocelot.UnitTests.csproj
     - name: Integration Tests
@@ -76,6 +78,8 @@ jobs:
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
+    - name: Force test.com to time out
+      run: echo "10.255.255.1 test.com" | sudo tee -a /etc/hosts
     - name: Cake Build
       uses: cake-build/cake-action@v3
       with:
